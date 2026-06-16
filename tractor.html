@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroView 3D — Trator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --dark:  #0c0b06;
+      --amber: #e8830a;
+      --gold:  #f5b731;
+      --cream: #f0e6cc;
+      --muted: #6a5c3a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--dark);
+      color: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      overflow: hidden;
+    }
+
+    /* Grain */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 100;
+    }
+
+    /* Bottom green glow */
+    body::after {
+      content: '';
+      position: fixed; bottom: 0; left: 0; right: 0; height: 35%;
+      background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(40,80,30,0.22), transparent);
+      pointer-events: none; z-index: 1;
+    }
+
+    /* ── VIEWER FULL SCREEN ── */
+    #container3D {
+      position: fixed; inset: 0;
+      z-index: 2;
+      cursor: grab;
+    }
+    #container3D:active { cursor: grabbing; }
+
+    /* ── HEADER ── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 28px 44px;
+      background: linear-gradient(to bottom, rgba(12,11,6,0.85) 0%, transparent 100%);
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.5rem;
+      letter-spacing: 0.14em;
+      color: var(--amber);
+    }
+    .logo span { color: var(--cream); }
+
+    .header-right {
+      display: flex; gap: 10px; align-items: center;
+    }
+    .nav-pill {
+      font-size: 0.68rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 6px 14px;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 20px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .nav-pill:hover { color: var(--cream); border-color: rgba(255,255,255,0.2); }
+
+    /* ── FLOATING SPECS (left) ── */
+    .specs-float {
+      position: fixed;
+      left: 44px; top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      display: flex; flex-direction: column; gap: 28px;
+    }
+
+    .spec-item {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .spec-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .spec-value {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.6rem;
+      color: var(--gold);
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
+    /* ── TITLE OVERLAY (top center) ── */
+    .title-overlay {
+      position: fixed;
+      top: 80px; left: 50%; transform: translateX(-50%);
+      z-index: 10;
+      text-align: center;
+      pointer-events: none;
+    }
+    .title-overlay h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      letter-spacing: 0.1em;
+      line-height: 1;
+      color: var(--cream);
+      opacity: 0.75;
+    }
+    .title-overlay h1 em {
+      font-style: normal;
+      color: var(--amber);
+    }
+
+    /* ── CTA (bottom center) ── */
+    .bottom-ui {
+      position: fixed;
+      bottom: 36px; left: 50%; transform: translateX(-50%);
+      z-index: 10;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+
+    .controls-hint {
+      display: flex; gap: 20px;
+    }
+    .hint-item {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 0.62rem; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .hint-icon {
+      width: 22px; height: 22px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+    }
+
+    .cta-btn {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 0.95rem;
+      letter-spacing: 0.18em;
+      color: var(--dark);
+      background: var(--amber);
+      border: none;
+      padding: 13px 42px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .cta-btn:hover { background: var(--gold); transform: translateY(-1px); }
+    .cta-btn:active { transform: translateY(0); }
+
+    /* ── LOADER ── */
+    .loader-wrap {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px; z-index: 20;
+      background: var(--dark);
+      transition: opacity 0.7s;
+    }
+    .loader-ring {
+      width: 52px; height: 52px;
+      border: 2px solid rgba(232,131,10,0.15);
+      border-top-color: var(--amber);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text {
+      font-size: 0.68rem; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--muted);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+  </style>
+</head>
+<body>
+
+  <!-- Full-screen 3D viewer -->
+  <div id="container3D"></div>
+
+  <!-- Loader -->
+  <div class="loader-wrap" id="loader">
+    <div class="loader-ring"></div>
+    <span class="loader-text">Carregando modelo…</span>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="logo">Agro<span>View</span></div>
+    <div class="header-right">
+      <a class="nav-pill" href="#">Modelos</a>
+      <a class="nav-pill" href="#">Contato</a>
+    </div>
+  </header>
+
+  <!-- Título fantasma -->
+  <div class="title-overlay">
+    <h1>Trator <em>Agrícola</em></h1>
+  </div>
+
+  <!-- Specs flutuantes -->
+  <div class="specs-float">
+    <div class="spec-item">
+      <span class="spec-label">Potência</span>
+      <span class="spec-value">220 CV</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Tração</span>
+      <span class="spec-value">4×4</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Peso</span>
+      <span class="spec-value">8.4 T</span>
+    </div>
+  </div>
+
+  <!-- Bottom UI -->
+  <div class="bottom-ui">
+    <div class="controls-hint">
+      <div class="hint-item">
+        <div class="hint-icon">⟳</div>
+        <span>Arrastar</span>
+      </div>
+      <div class="hint-item">
+        <div class="hint-icon">⇅</div>
+        <span>Zoom</span>
+      </div>
+    </div>
+    <button class="cta-btn">Solicitar Proposta</button>
+  </div>
+
+  <script type="module">
+document.addEventListener('DOMContentLoaded', () => {
+  const container3D = document.getElementById('container3D');
+  const loaderEl    = document.getElementById('loader');
+
+  import("https://cdn.skypack.dev/three@0.129.0/build/three.module.js").then(THREE => {
+    import("https://cdn.skypack.dev/three@0.129.0/examples/jsm/controls/OrbitControls.js").then(({ OrbitControls }) => {
+      import("https://cdn.skypack.dev/three@0.129.0/examples/jsm/loaders/GLTFLoader.js").then(({ GLTFLoader }) => {
+
+        const W = () => container3D.clientWidth;
+        const H = () => container3D.clientHeight;
+
+        const scene    = new THREE.Scene();
+        const camera   = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 1000);
+        camera.position.set(0, 1.5, 6);
+
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(W(), H());
+        renderer.shadowMap.enabled = true;
+        container3D.appendChild(renderer.domElement);
+
+        // Luzes
+        scene.add(new THREE.AmbientLight(0xfff4e0, 1.4));
+
+        const sun = new THREE.DirectionalLight(0xffe0a0, 2.2);
+        sun.position.set(5, 10, 7);
+        scene.add(sun);
+
+        const fill = new THREE.DirectionalLight(0x88bbff, 0.5);
+        fill.position.set(-6, 2, -5);
+        scene.add(fill);
+
+        const rim = new THREE.DirectionalLight(0xff8800, 0.4);
+        rim.position.set(0, -3, -7);
+        scene.add(rim);
+
+        // Controles
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping    = true;
+        controls.dampingFactor    = 0.05;
+        controls.enableZoom       = true;
+        controls.autoRotate       = true;
+        controls.autoRotateSpeed  = 0.5;
+        controls.minPolarAngle    = Math.PI / 8;
+        controls.maxPolarAngle    = Math.PI / 2.05;
+        controls.minDistance      = 2;
+        controls.maxDistance      = 20;
+
+        // 🔥 RAYCAST (CLIQUE)
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        let model;
+
+        const gltfLoader = new GLTFLoader();
+
+        gltfLoader.load(
+          "/models/tractor/scene.gltf",
+          (gltf) => {
+            model = gltf.scene;
+
+            const box    = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size   = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale  = 5 / maxDim;
+
+            model.scale.setScalar(scale);
+            model.position.sub(center.multiplyScalar(scale));
+            model.position.y -= (size.y * scale) * 0.1;
+
+            scene.add(model);
+
+            // 🔍 MOSTRAR NOMES DAS PEÇAS (IMPORTANTE)
+            model.traverse((child) => {
+              if (child.isMesh) {
+                console.log("Peça encontrada:", child.name);
+              }
+            });
+
+            loaderEl.style.opacity = '0';
+            setTimeout(() => loaderEl.style.display = 'none', 700);
+          },
+          undefined,
+          (err) => {
+            console.error(err);
+            loaderEl.querySelector('.loader-text').textContent = 'Erro ao carregar modelo';
+          }
+        );
+
+        // 🎯 EVENTO DE CLIQUE
+        window.addEventListener('click', (event) => {
+
+          mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+          mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+          raycaster.setFromCamera(mouse, camera);
+
+          if (!model) return;
+
+          const intersects = raycaster.intersectObjects(model.children, true);
+
+          if (intersects.length > 0) {
+            const objeto = intersects[0].object;
+
+            console.log("Você clicou em:", objeto.name);
+
+            // Resetar cor (opcional)
+            model.traverse((child) => {
+              if (child.isMesh && child.material.emissive) {
+                child.material.emissive.set(0x000000);
+              }
+            });
+
+            // Highlight na peça clicada
+            if (objeto.material && objeto.material.emissive) {
+              objeto.material.emissive.set(0xff0000);
+            }
+
+            // 🔥 PERSONALIZA AQUI COM OS NOMES DO SEU MODELO
+            const nome = objeto.name.toLowerCase();
+
+            if (nome.includes("wheel") || nome.includes("roda")) {
+              alert("Você clicou na roda!");
+            } 
+            else if (nome.includes("steering") || nome.includes("volante")) {
+              alert("Você clicou no volante!");
+            } 
+            else if (nome.includes("engine") || nome.includes("motor")) {
+              alert("Você clicou no motor!");
+            } 
+            else {
+              alert("Parte do trator clicada!");
+            }
+          }
+        });
+
+        function animate() {
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+          camera.aspect = W() / H();
+          camera.updateProjectionMatrix();
+          renderer.setSize(W(), H());
+        });
+
+      });
+    });
+  });
+});
+</script>
+</body>
+</html>
